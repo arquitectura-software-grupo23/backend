@@ -1,0 +1,29 @@
+version: "3.8"
+services:
+  mqtt:
+    build:
+      context: ./mqtt
+      dockerfile: Dockerfile.dev
+    volumes:
+      - ./mqtt:/app
+    links:
+        - api
+  api:
+    build:
+      context: ./api
+      dockerfile: Dockerfile.dev
+    links:
+      - mongo
+    volumes:
+      - ./api:/app
+    ports:
+      - 3000:3000
+  mongo:
+    image: mongo
+    ports:
+      - 27017:27017
+    volumes:
+      - mongo-data:/data/db
+
+volumes:
+  mongo-data: 

@@ -1,0 +1,32 @@
+{
+  "name": "e0-2023-2-v4rgas",
+  "version": "1.0.0",
+  "description": "***Fecha de entrega:** 03/09/2023 - 3 Semanas*",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/iic2173/e0-2023-2-v4rgas.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/iic2173/e0-2023-2-v4rgas/issues"
+  },
+  "homepage": "https://github.com/iic2173/e0-2023-2-v4rgas#readme",
+  "devDependencies": {
+    "eslint": "^8.47.0",
+    "eslint-config-airbnb-base": "^15.0.0",
+    "eslint-plugin-import": "^2.28.0"
+  },
+  "dependencies": {
+    "dotenv": "^16.3.1",
+    "mqtt": "^5.0.3",
+    "node-fetch": "^3.3.2"
+  }
+}
