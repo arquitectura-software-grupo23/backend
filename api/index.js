@@ -10,8 +10,6 @@ mongoose.connect('mongodb://mongo:27017/stocks')
 const app = express();
 const port = 3000;
 
-app.context.orm = orm;
-app.use(cors());
 app.use(express.json());
 app.use(cors());
 
