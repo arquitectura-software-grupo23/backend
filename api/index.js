@@ -2,6 +2,7 @@ const mongoose = require('mongoose');
 const express = require('express');
 const Stock = require('./Stock');
 const LatestStock = require('./LatestStock');
+const cors = require('cors');
 
 mongoose.connect('mongodb://mongo:27017/stocks')
   .then((db) => console.log('Connected!', db.connection.host));
@@ -9,7 +10,10 @@ mongoose.connect('mongodb://mongo:27017/stocks')
 const app = express();
 const port = 3000;
 
+app.context.orm = orm;
+app.use(cors());
 app.use(express.json());
+app.use(cors());
 
 app.get('/', (req, res) => {
   res.send('API STOCKS');
