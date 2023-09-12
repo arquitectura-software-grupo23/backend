@@ -7,7 +7,9 @@ services:
     volumes:
       - ./mqtt:/app
     links:
-        - api
+      - api
+    ports:
+      - 3001:3001
   api:
     build:
       context: ./api
@@ -26,4 +28,4 @@ services:
       - mongo-data:/data/db
 
 volumes:
-  mongo-data: 
+  mongo-data:

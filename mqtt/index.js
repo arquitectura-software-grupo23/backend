@@ -1,38 +1,82 @@
-const mqtt = require('mqtt');
-require('dotenv').config();
+const mqtt = require("mqtt");
+const express = require("express");
+const cors = require("cors");
 
-const fetch = (...args) => import('node-fetch').then(({ default: fetch }) => fetch(...args));
+const fetch = (...args) =>
+  import("node-fetch").then(({ default: fetch }) => fetch(...args));
+
+require("dotenv").config();
 
 const url = `mqtt://${process.env.MQTT_HOST}:${process.env.MQTT_PORT}`;
 
-// Create an MQTT client instance
 const options = {
-  // Authentication
   username: process.env.MQTT_USER,
   password: process.env.MQTT_PASSWORD,
 };
 
 const client = mqtt.connect(url, options);
-client.on('connect', () => {
-  console.log('Connected');
-
-  // Aqui se suscribe al canal
-  client.subscribe('stocks/info', (err) => {
-    if (!err) {
-      // Publish a message to a topic
-      // client.publish('test', 'Hello mqtt');
-    }
-  });
+client.on("connect", () => {
+  console.log("Connected to MQTT");
+  client.subscribe("stocks/info", () => {});
+  client.subscribe("stocks/validation", () => {});
 });
 
-// Receive messages
-client.on('message', async (topic, message) => {
-  // message is Buffer
-  // console.log(topic, JSON.parse(message));
-  const response = await fetch('http://api:3000/stock', {
-    method: 'post',
-    body: JSON.parse(message).stocks,
-    headers: { 'Content-Type': 'application/json' },
-  });
-  // client.end();
+client.on("message", async (topic, message) => {
+  console.log(topic);
+
+  if (topic === "stocks/info") {
+    console.log("Message from: Info");
+    const response = await fetch("http://api:3000/stock", {
+      method: "post",
+      body: JSON.parse(message).stocks,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
+  if (topic === "stocks/validation") {
+    console.log("Message from: Validation");
+    console.log(message.toString());
+    if (parsedJson.group_id === 23) {
+      try {
+        const response = await fetch("http://api:3000/validation", {
+          method: "post",
+          body: JSON.stringify(parsedJson),
+          headers: { "Content-Type": "application/json" },
+        });
+      } catch (error) {
+        console.log("Error in topic socks/validation: ", error);
+      }
+    }
+  }
+});
+
+const app = express();
+const port = 3001;
+
+app.use(express.json());
+app.use(cors());
+
+app.get("/", (req, res) => {
+  res.send("API MQTT");
+});
+
+app.post("/request", async (req, res) => {
+  // req.body
+  // {
+  //   "request_id": uuid,
+  //   "group_id": string (número de grupo),
+  //   "symbol": string,
+  //   "datetime": string,
+  //   "deposit_token": "",
+  //   "quantity": number,
+  //   "seller": 0
+  // }
+  console.log("POST request");
+  console.log(req.body);
+  client.publish("stocks/requests", JSON.stringify(req.body));
+  res.end();
+});
+
+app.listen(port, () => {
+  console.log(`API INICIADA EN PUERTO ${port}`);
 });
