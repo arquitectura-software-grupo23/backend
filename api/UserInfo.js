@@ -5,4 +5,4 @@ const userInfoSchema = new mongoose.Schema({
   wallet: Number,
 }, { timestamps: true });
 
-module.exports = mongoose.model('Stock', userInfoSchema)
+module.exports = mongoose.model('UserInfo', userInfoSchema);

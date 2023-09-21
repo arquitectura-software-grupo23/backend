@@ -8,4 +8,4 @@ const stockSchema = new mongoose.Schema({
   source: String,
 }, { timestamps: true });
 
-module.exports = mongoose.model('Stock', stockSchema)
+module.exports = mongoose.model('Stock', stockSchema);

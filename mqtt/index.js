@@ -36,11 +36,11 @@ client.on("message", async (topic, message) => {
   if (topic === "stocks/validation") {
     console.log("Message from: Validation");
     console.log(message.toString());
-    if (parsedJson.group_id === 23) {
+    if (message.group_id === 23) {
       try {
         const response = await fetch("http://api:3000/validation", {
           method: "post",
-          body: JSON.stringify(parsedJson),
+          body: JSON.stringify(message),
           headers: { "Content-Type": "application/json" },
         });
       } catch (error) {
