@@ -25,14 +25,23 @@ app.get('/stocks', async (req, res) => {
 app.get('/stocks/:symbol', async (req, res) => {
   console.log('GET /stocks/:symbol', req.params, req.query);
 
-  let { page, size } = req.query;
+  let { page, size, date } = req.query;
   page ??= 1;
   size ??= 50;
+  date ??= new Date(0);
 
   const { symbol } = req.params;
 
   try {
-    res.send(await Stock.find({ symbol }, '-_id -__v -createdAt').sort({ createdAt: -1 }).skip((page - 1) * size).limit(size));
+    res.send(
+      await Stock.find(
+        { createdAt: { $gte: date }, symbol },
+        '-_id -__v -createdAt',
+      )
+        .sort({ createdAt: -1 })
+        .skip((page - 1) * size)
+        .limit(size),
+    );
   } catch (error) {
     res.send({ error: 'Invalid query params' });
   }
