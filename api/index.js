@@ -117,6 +117,52 @@ app.post("/stock", (req, res) => {
   res.end();
 });
 
+app.post('/logUser', async (req, res) => {
+  console.log('POST /logUser');
+  
+  const { id } = req.body;
+
+  if (!id) {
+    return res.send({ error: 'ID is required' });
+  }
+  try {
+    let user = await UserInfo.findOne({ userID: id });
+    if (!user) {
+      user = new UserInfo({
+        userID: id,
+        wallet: 0
+      });
+      await user.save();
+    }
+    res.end();
+  } catch (error) {
+    res.send({ error: 'Internal server error' });
+  }
+});
+
+app.post('/addMoney', async (req, res) => {
+  console.log('POST /addMoney');
+  const { id, amount } = req.body;
+  if (!id || !amount) {
+    return res.send({ error: 'ID and amount are required' });
+  }
+  if (typeof amount !== 'number' || amount <= 0) {
+    return res.send({ error: 'Amount must be a positive number' });
+  }
+  try {
+    let user = await UserInfo.findOne({ userID: id });
+    if (!user) {
+      return res.send({ error: 'User does not exists' });
+    } else {
+      user.wallet += amount;
+    }
+    await user.save();
+    res.send({ message: 'Money added successfully' });
+  } catch (error) {
+    res.send({ error: 'Internal server error' });
+  }
+});
+
 app.listen(port, () => {
   console.log(`API INICIADA EN PUERTO ${port}`);
 });
