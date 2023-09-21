@@ -5,6 +5,7 @@ const Stock = require("./Stock");
 const Validation = require("./Validation");
 const Request = require("./Request");
 const LatestStock = require("./LatestStock");
+const UserInfo = require('./UserInfo');
 
 const fetch = (...args) =>
   import("node-fetch").then(({ default: fetch }) => fetch(...args));
@@ -121,7 +122,7 @@ app.post('/logUser', async (req, res) => {
   console.log('POST /logUser');
   
   const { id } = req.body;
-
+  
   if (!id) {
     return res.send({ error: 'ID is required' });
   }
@@ -132,6 +133,7 @@ app.post('/logUser', async (req, res) => {
         userID: id,
         wallet: 0
       });
+      console.log('usuario creado con éxito', user);
       await user.save();
     }
     res.end();
