@@ -2,30 +2,25 @@ version: "3.8"
 services:
   mqtt:
     build: ./mqtt
+    ports:
+      - 3001:3001
     links:
       - api
-    restart: 
-      always
+    restart: always
   api:
     build: ./api
     ports:
       - 3000:3000
     links:
       - mongo
-    restart: 
-      always
+    restart: always
   mongo:
     image: mongo
     ports:
       - 27017:27017
-    # environment:
-    #   - MONGO_INITDB_ROOT_USERNAME=stocks
-    #   - MONGO_INITDB_ROOT_PASSWORD=stocks
     volumes:
       - mongo-data:/data/db
-    restart: 
-      always
+    restart: always
 
 volumes:
-  mongo-data: 
-
+  mongo-data:
