@@ -163,24 +163,20 @@ app.post('/logUser', async (req, res) => {
 app.post('/addMoney', async (req, res) => {
   console.log('POST /addMoney');
   const { id, amount } = req.body;
-  if (!id || !amount) {
-    return res.send({ error: 'ID and amount are required' });
-  }
-  if (typeof amount !== 'number' || amount <= 0) {
-    return res.send({ error: 'Amount must be a positive number' });
-  }
-  try {
-    const user = await UserInfo.findOne({ userID: id });
-    if (!user) {
-      return res.send({ error: 'User does not exists' });
-    }
-    user.wallet += amount;
+  const amountInt = parseInt(amount, 10);
+  await UserInfo.updateOne({ userID: id }, { $inc: { wallet: amountInt } });
+  res.end();
+});
 
-    await user.save();
-    res.send({ message: 'Money added successfully' });
-  } catch (error) {
-    res.send({ error: 'Internal server error' });
-  }
+app.get('/getMoney/:id', async (req, res) => {
+  console.log('Get /getMoney');
+  const userId = req.params.id; // Obtener el ID del usuario de los parámetros de la ruta
+  res.send(await UserInfo.find(UserInfo.where('userID').equals(userId)));
+});
+
+app.get('/users', async (req, res) => {
+  console.log('GET /users');
+  res.send(await UserInfo.find({}, '-_id -__v'));
 });
 
 app.listen(port, () => {
