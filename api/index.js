@@ -1,18 +1,17 @@
-const mongoose = require("mongoose");
-const express = require("express");
-const cors = require("cors");
-const Stock = require("./Stock");
-const Validation = require("./Validation");
-const Request = require("./Request");
-const LatestStock = require("./LatestStock");
+const mongoose = require('mongoose');
+const express = require('express');
+const cors = require('cors');
+const Stock = require('./Stock');
+const Validation = require('./Validation');
+const Request = require('./Request');
+const LatestStock = require('./LatestStock');
 const UserInfo = require('./UserInfo');
 
-const fetch = (...args) =>
-  import("node-fetch").then(({ default: fetch }) => fetch(...args));
+const fetch = (...args) => import('node-fetch').then(({ default: fetch }) => fetch(...args));
 
 mongoose
-  .connect("mongodb://mongo:27017/stocks")
-  .then((db) => console.log("Connected!", db.connection.host));
+  .connect('mongodb://mongo:27017/stocks')
+  .then((db) => console.log('Connected!', db.connection.host));
 
 const app = express();
 const port = 3000;
@@ -20,17 +19,17 @@ const port = 3000;
 app.use(express.json());
 app.use(cors());
 
-app.get("/", (req, res) => {
-  res.send("API STOCKS");
+app.get('/', (req, res) => {
+  res.send('API STOCKS');
 });
 
-app.get("/stocks", async (req, res) => {
-  console.log("GET /stocks");
-  res.send(await LatestStock.find({}, "-_id -__v -createdAt"));
+app.get('/stocks', async (req, res) => {
+  console.log('GET /stocks');
+  res.send(await LatestStock.find({}, '-_id -__v -createdAt'));
 });
 
-app.get("/stocks/:symbol", async (req, res) => {
-  console.log("GET /stocks/:symbol", req.params, req.query);
+app.get('/stocks/:symbol', async (req, res) => {
+  console.log('GET /stocks/:symbol', req.params, req.query);
 
   let { page, size, date } = req.query;
   page ??= 1;
@@ -43,27 +42,45 @@ app.get("/stocks/:symbol", async (req, res) => {
     res.send(
       await Stock.find(
         { createdAt: { $gte: date }, symbol },
-        "-_id -__v -createdAt"
+        '-_id -__v -createdAt',
       )
         .sort({ createdAt: -1 })
         .skip((page - 1) * size)
-        .limit(size)
+        .limit(size),
     );
   } catch (error) {
     console.log(error);
-    res.send({ error: "Invalid query params" });
+    res.send({ error: 'Invalid query params' });
   }
 });
 
-app.get("/requests", async (req, res) => {
-  console.log("GET /requests");
+app.get('/requests', async (req, res) => {
+  console.log('GET /requests');
   res.send(await Request.find());
 });
 
-app.post("/request", async (req, res) => {
-  console.log("POST /requests");
+app.get('/requestsWithValidations', async (req, res) => {
+  console.log('GET /validRequests');
+
+  const { user_id } = req.query;
+  const requests = await Request.aggregate()
+    .match({ user_id })
+    .lookup(
+      {
+        from: 'validations',
+        localField: 'request_id',
+        foreignField: 'request_id',
+        as: 'validations',
+      },
+    )
+    .exec();
+
+  res.send(test);
+});
+
+app.post('/request', async (req, res) => {
+  console.log('POST /requests');
   try {
-    // data = await fetch("http://mqtt:3001/");
     const {
       request_id,
       group_id,
@@ -84,31 +101,32 @@ app.post("/request", async (req, res) => {
       seller,
     });
     console.log(newBody);
-    const response = await fetch("http://mqtt:3001/request", {
-      method: "post",
+    const response = await fetch('http://mqtt:3001/request', {
+      method: 'post',
       body: newBody,
-      headers: { "Content-Type": "application/json" },
+      headers: { 'Content-Type': 'application/json' },
     });
   } catch (error) {
-    return res.send({ error: "Failed to fetch mqtt/request" });
+    return res.send({ error: 'Failed to fetch mqtt/request' });
   }
 
   res.send(req.body);
 });
 
-app.get("/validations", async (req, res) => {
-  console.log("GET /validation");
+app.get('/validations', async (req, res) => {
+  console.log('GET /validations');
   res.send(await Validation.find());
 });
 
-app.post("/validation", async (req, res) => {
-  console.log("POST /validation");
+app.post('/validation', async (req, res) => {
+  console.log('POST /validation');
+  console.log(req.body);
   await Validation.create(req.body);
   res.end();
 });
 
-app.post("/stock", (req, res) => {
-  console.log("POST /stock");
+app.post('/stock', (req, res) => {
+  console.log('POST /stock');
   req.body.forEach(async (stock) => {
     await Stock.create(stock);
     await LatestStock.findOneAndUpdate({ symbol: stock.symbol }, stock, {
@@ -120,9 +138,9 @@ app.post("/stock", (req, res) => {
 
 app.post('/logUser', async (req, res) => {
   console.log('POST /logUser');
-  
+
   const { id } = req.body;
-  
+
   if (!id) {
     return res.send({ error: 'ID is required' });
   }
@@ -131,7 +149,7 @@ app.post('/logUser', async (req, res) => {
     if (!user) {
       user = new UserInfo({
         userID: id,
-        wallet: 0
+        wallet: 0,
       });
       console.log('usuario creado con éxito', user);
       await user.save();
@@ -152,12 +170,12 @@ app.post('/addMoney', async (req, res) => {
     return res.send({ error: 'Amount must be a positive number' });
   }
   try {
-    let user = await UserInfo.findOne({ userID: id });
+    const user = await UserInfo.findOne({ userID: id });
     if (!user) {
       return res.send({ error: 'User does not exists' });
-    } else {
-      user.wallet += amount;
     }
+    user.wallet += amount;
+
     await user.save();
     res.send({ message: 'Money added successfully' });
   } catch (error) {
