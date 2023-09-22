@@ -75,7 +75,7 @@ app.get('/requestsWithValidations', async (req, res) => {
     )
     .exec();
 
-  res.send(test);
+  res.send(requests);
 });
 
 app.post('/request', async (req, res) => {
@@ -164,7 +164,11 @@ app.post('/addMoney', async (req, res) => {
   console.log('POST /addMoney');
   const { id, amount } = req.body;
   const amountInt = parseInt(amount, 10);
-  await UserInfo.updateOne({ userID: id }, { $inc: { wallet: amountInt } });
+  try {
+    await UserInfo.updateOne({ userID: id }, { $inc: { wallet: amountInt } });
+  } catch (error) {
+    res.send({ error });
+  }
   res.end();
 });
 
