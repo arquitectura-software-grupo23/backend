@@ -54,6 +54,61 @@ app.get('/stocks/:symbol', async (req, res) => {
   }
 });
 
+app.get('/candlestick/:symbol', async (req, res) => {
+  console.log('GET /candlestick/:symbol', req.params, req.query);
+
+  let { candleSpanMins, chartSpanDays } = req.query;
+  const { symbol } = req.params;
+
+  // Default
+  candleSpanMins = parseInt(candleSpanMins, 10) || 60;// Minutes int
+  chartSpanDays = parseInt(chartSpanDays, 10) || 7;// Days int
+  // Param to date conversion
+  const startDate = new Date(Date.now() - chartSpanDays * 24 * 60 * 60 * 1000);
+
+  const groupInterval = candleSpanMins * 60 * 1000;
+
+  try {
+    const candleData = await Stock.aggregate([
+      {
+        $match: {
+          symbol,
+          updatedAt: { $gte: startDate },
+        },
+      },
+      {
+        $group: {
+          _id: {
+            $subtract: [
+              { $toLong: '$updatedAt' },
+              { $mod: [{ $toLong: '$updatedAt' }, groupInterval] },
+            ],
+          },
+          high: { $max: '$price' },
+          low: { $min: '$price' },
+          open: { $first: '$price' },
+          close: { $last: '$price' },
+        },
+      },
+      {
+        $project: {
+          candleTimeStamp: '$_id',
+          high: 1,
+          low: 1,
+          open: 1,
+          close: 1,
+        },
+      },
+      { $sort: { candleTimeStamp: 1 } },
+    ]);
+
+    res.send({ data: candleData });
+  } catch (error) {
+    console.error(error);
+    res.status(500).send({ error: 'Error fetching candlestick data' });
+  }
+});
+
 app.get('/requests', async (req, res) => {
   console.log('GET /requests');
   res.send(await Request.find());
