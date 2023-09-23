@@ -89,6 +89,7 @@ app.post('/request', async (req, res) => {
       deposit_token,
       quantity,
       seller,
+      user_id,
     } = await Request.create(req.body);
 
     const newBody = JSON.stringify({
@@ -100,7 +101,11 @@ app.post('/request', async (req, res) => {
       quantity,
       seller,
     });
-    console.log(newBody);
+
+    const stock = await LatestStock.findOne({ symbol });
+    console.log(user_id, stock.price)
+    await UserInfo.updateOne({ userID: user_id }, { $inc: { wallet: stock.price * -1 } });
+
     const response = await fetch('http://mqtt:3001/request', {
       method: 'post',
       body: newBody,

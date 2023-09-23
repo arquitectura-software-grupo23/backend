@@ -1,5 +1,5 @@
-const mongoose = require("mongoose");
-const { v4: uuidv4 } = require("uuid");
+const mongoose = require('mongoose');
+const { v4: uuidv4 } = require('uuid');
 
 const requestSchema = new mongoose.Schema(
   {
@@ -10,8 +10,10 @@ const requestSchema = new mongoose.Schema(
     quantity: Number,
     seller: Number,
     user_id: String,
+    user_location: String,
+    user_ip: String,
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
-module.exports = mongoose.model("Request", requestSchema);
+module.exports = mongoose.model('Request', requestSchema);
