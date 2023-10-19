@@ -141,7 +141,7 @@ const createTransbankTransaction = async (price) => {
   const transaction = await (new WebpayPlus.Transaction()).create(
     'ID',
     'ID',
-    Math.ceil(price*1000),
+    Math.ceil(price * 1000),
     'https://stocknet.me',
   );
 
@@ -210,6 +210,11 @@ app.post('/validation', async (req, res) => {
   console.log('POST /validation');
   console.log(req.body);
   await Validation.create(req.body);
+  res.end();
+});
+
+app.post('/validate', async (req, res) => {
+  console.log(req.body);
   res.end();
 });
 
