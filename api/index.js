@@ -1,6 +1,10 @@
+/* eslint-disable camelcase */
+/* eslint-disable consistent-return */
+/* eslint-disable no-console */
 const mongoose = require('mongoose');
 const express = require('express');
 const cors = require('cors');
+const { WebpayPlus } = require('transbank-sdk'); // ES5
 const Stock = require('./Stock');
 const Validation = require('./Validation');
 const Request = require('./Request');
@@ -133,44 +137,68 @@ app.get('/requestsWithValidations', async (req, res) => {
   res.send(requests);
 });
 
+const createTransbankTransaction = async (price) => {
+  const transaction = await (new WebpayPlus.Transaction()).create(
+    'ID',
+    'ID',
+    Math.ceil(price*1000),
+    'https://stocknet.me',
+  );
+
+  return transaction;
+};
+
 app.post('/request', async (req, res) => {
   console.log('POST /requests');
+
   try {
+    const {
+      symbol, quantity, user_id, user_ip, user_location,
+    } = req.body;
+
+    const request = Request.create({
+      group_id: '23',
+      symbol,
+      quantity,
+      seller: '0',
+      user_id,
+      user_ip,
+      user_location,
+    });
+
     const {
       request_id,
       group_id,
-      symbol,
       createdAt,
-      deposit_token,
-      quantity,
       seller,
-      user_id,
-    } = await Request.create(req.body);
+    } = request;
+
+    const stock = await LatestStock.findOne({ symbol });
+    console.log(user_id, stock.price);
+    // await UserInfo.updateOne({ userID: user_id }, { $inc: { wallet: stock.price * -1 } });
+
+    const transaction = await createTransbankTransaction(quantity * stock.price);
+    await Request.updateOne({ request_id }, { deposit_token: transaction.token });
 
     const newBody = JSON.stringify({
       request_id,
       group_id,
       symbol,
       datetime: createdAt,
-      deposit_token,
+      deposit_token: transaction.token,
       quantity,
       seller,
     });
 
-    const stock = await LatestStock.findOne({ symbol });
-    console.log(user_id, stock.price)
-    await UserInfo.updateOne({ userID: user_id }, { $inc: { wallet: stock.price * -1 } });
-
-    const response = await fetch('http://mqtt:3001/request', {
-      method: 'post',
-      body: newBody,
-      headers: { 'Content-Type': 'application/json' },
-    });
+    // await fetch('http://mqtt:3001/request', {
+    //   method: 'post',
+    //   body: newBody,
+    //   headers: { 'Content-Type': 'application/json' },
+    // });
+    res.send(transaction);
   } catch (error) {
     return res.send({ error: 'Failed to fetch mqtt/request' });
   }
-
-  res.send(req.body);
 });
 
 app.get('/validations', async (req, res) => {
@@ -204,6 +232,7 @@ app.post('/logUser', async (req, res) => {
   if (!id) {
     return res.send({ error: 'ID is required' });
   }
+
   try {
     let user = await UserInfo.findOne({ userID: id });
     if (!user) {
@@ -216,7 +245,7 @@ app.post('/logUser', async (req, res) => {
     }
     res.end();
   } catch (error) {
-    res.send({ error: 'Internal server error' });
+    return res.send({ error: 'Internal server error' });
   }
 });
 
