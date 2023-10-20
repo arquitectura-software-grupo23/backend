@@ -10,6 +10,7 @@ const Validation = require('./Validation');
 const Request = require('./Request');
 const LatestStock = require('./LatestStock');
 const UserInfo = require('./UserInfo');
+const nodemailer = require('nodemailer');
 
 const fetch = (...args) => import('node-fetch').then(({ default: fetch }) => fetch(...args));
 
@@ -22,6 +23,14 @@ const port = 3000;
 
 app.use(express.json());
 app.use(cors());
+
+const transporter = nodemailer.createTransport({
+  service: 'gmail',
+  auth: {
+    user: 'grupo23AWS@gmail.com',
+    pass: 'Grupo23AWS',
+  },
+});
 
 app.get('/', (req, res) => {
   res.send('API STOCKS');
@@ -142,7 +151,7 @@ const createTransbankTransaction = async (price) => {
     'ID',
     'ID',
     Math.ceil(price * 1000),
-    'https://stocknet.me',
+    'http://localhost:5173/validate',
   );
 
   return transaction;
@@ -156,7 +165,7 @@ app.post('/request', async (req, res) => {
       symbol, quantity, user_id, user_ip, user_location,
     } = req.body;
 
-    const request = Request.create({
+    const request = await Request.create({
       group_id: '23',
       symbol,
       quantity,
@@ -178,6 +187,7 @@ app.post('/request', async (req, res) => {
     // await UserInfo.updateOne({ userID: user_id }, { $inc: { wallet: stock.price * -1 } });
 
     const transaction = await createTransbankTransaction(quantity * stock.price);
+    console.log(await Request.findOne({request_id}))
     await Request.updateOne({ request_id }, { deposit_token: transaction.token });
 
     const newBody = JSON.stringify({
@@ -190,11 +200,11 @@ app.post('/request', async (req, res) => {
       seller,
     });
 
-    // await fetch('http://mqtt:3001/request', {
-    //   method: 'post',
-    //   body: newBody,
-    //   headers: { 'Content-Type': 'application/json' },
-    // });
+    await fetch('http://mqtt:3001/request', {
+      method: 'post',
+      body: newBody,
+      headers: { 'Content-Type': 'application/json' },
+    });
     res.send(transaction);
   } catch (error) {
     return res.send({ error: 'Failed to fetch mqtt/request' });
@@ -205,16 +215,59 @@ app.get('/validations', async (req, res) => {
   console.log('GET /validations');
   res.send(await Validation.find());
 });
-
 app.post('/validation', async (req, res) => {
   console.log('POST /validation');
   console.log(req.body);
   await Validation.create(req.body);
+  // if (req.body.group_id === '23' && req.body.valid) {
+  //   const request = await Request.findOne({ request_id: req.body.request_id });
+  //   if (!request) {
+  //     console.log('Request no encontrado.');
+  //     return res.status(404).send('Request no encontrado.');
+  //   }
+
+  //   const mailOptions = {
+  //     from: 'grupo23AWS@gmail.com',
+  //     to: request.user_mail,
+  //     subject: 'Compra exitosa',
+  //     text: 'Su compra ha sido exitosa blablabla',
+  //   };
+
+  //   transporter.sendMail(mailOptions, (error, info) => {
+  //     if (error) {
+  //       console.log(error);
+  //       return res.status(500).send('Error al enviar el correo.');
+  //     }
+  //     console.log('Correo enviado: ' + info.response);
+  //   });
+  // }
   res.end();
 });
 
 app.post('/validate', async (req, res) => {
   console.log(req.body);
+  let valid;
+ 
+  if (req.body.TBK_TOKEN) {
+    valid = false;
+  } else {
+    try {
+      await new WebpayPlus.Transaction().commit(req.body.token_ws);
+      const status = await new WebpayPlus.Transaction().status(req.body.token_ws);
+      
+      valid = status.response_code == 0;
+      
+      console.log(status)
+    } catch (error) {
+      console.log(error)
+      valid = false;
+    }
+
+  }
+
+  const request = await Request.findOne({deposit_token: req.body.TBK_TOKEN || req.body.token_ws})
+  console.log(request)
+  
   res.end();
 });
 
@@ -232,7 +285,7 @@ app.post('/stock', (req, res) => {
 app.post('/logUser', async (req, res) => {
   console.log('POST /logUser');
 
-  const { id } = req.body;
+  const { id , mail} = req.body;
 
   if (!id) {
     return res.send({ error: 'ID is required' });
@@ -243,6 +296,7 @@ app.post('/logUser', async (req, res) => {
     if (!user) {
       user = new UserInfo({
         userID: id,
+        user_mail: mail,
         wallet: 0,
       });
       console.log('usuario creado con éxito', user);
