@@ -5,12 +5,12 @@ const mongoose = require('mongoose');
 const express = require('express');
 const cors = require('cors');
 const { WebpayPlus } = require('transbank-sdk'); // ES5
+const nodemailer = require('nodemailer');
 const Stock = require('./Stock');
 const Validation = require('./Validation');
 const Request = require('./Request');
 const LatestStock = require('./LatestStock');
 const UserInfo = require('./UserInfo');
-const nodemailer = require('nodemailer');
 
 const fetch = (...args) => import('node-fetch').then(({ default: fetch }) => fetch(...args));
 
@@ -187,7 +187,7 @@ app.post('/request', async (req, res) => {
     // await UserInfo.updateOne({ userID: user_id }, { $inc: { wallet: stock.price * -1 } });
 
     const transaction = await createTransbankTransaction(quantity * stock.price);
-    console.log(await Request.findOne({request_id}))
+    console.log(await Request.findOne({ request_id }));
     await Request.updateOne({ request_id }, { deposit_token: transaction.token });
 
     const newBody = JSON.stringify({
@@ -247,27 +247,43 @@ app.post('/validation', async (req, res) => {
 app.post('/validate', async (req, res) => {
   console.log(req.body);
   let valid;
- 
+
   if (req.body.TBK_TOKEN) {
     valid = false;
   } else {
     try {
       await new WebpayPlus.Transaction().commit(req.body.token_ws);
       const status = await new WebpayPlus.Transaction().status(req.body.token_ws);
-      
-      valid = status.response_code == 0;
-      
-      console.log(status)
+
+      valid = status.response_code === 0;
+
+      console.log(status);
     } catch (error) {
-      console.log(error)
+      console.log(error);
       valid = false;
     }
-
   }
 
-  const request = await Request.findOne({deposit_token: req.body.TBK_TOKEN || req.body.token_ws})
-  console.log(request)
-  
+  // hacer endpoint 3001: recibir el status del pago y mandar el validate en mqtt
+  // hacer endpoint 3001: recibir validaciones con listening y mandarlas al 3000 (validation)
+
+  // revisar lo del correo
+  // implementar lo del pdf tanto en back como en front
+
+  const request = await Request.findOne({ deposit_token: req.body.TBK_TOKEN || req.body.token_ws });
+  console.log(request);
+
+  await fetch('http://mqtt:3001/validation', {
+    method: 'post',
+    body: JSON.stringify({
+      request_id: request.request_id,
+      group_id: 23,
+      seller: 0,
+      valid,
+    }),
+    headers: { 'Content-Type': 'application/json' },
+  });
+
   res.end();
 });
 
@@ -285,7 +301,7 @@ app.post('/stock', (req, res) => {
 app.post('/logUser', async (req, res) => {
   console.log('POST /logUser');
 
-  const { id , mail} = req.body;
+  const { id, mail } = req.body;
 
   if (!id) {
     return res.send({ error: 'ID is required' });
