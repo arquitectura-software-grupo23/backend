@@ -192,6 +192,7 @@ app.post('/stock', (req, res) => {
     await LatestStock.findOneAndUpdate({ symbol: stock.symbol }, stock, {
       upsert: true,
     });
+    console.log(stock)
   });
   res.end();
 });
@@ -248,8 +249,7 @@ app.listen(port, () => {
 });
 
 function getPastDate(futureDate) {
-  const pastDate = new Date();
-  pastDate.setTime(futureDate - (Date.now() - futureDate));
+  const pastDate = new Date(futureDate-2*(futureDate-Date.now()));
   return pastDate;
 }
 
@@ -271,11 +271,11 @@ app.post('/requestProjection/:symbol', async (req, res) => {
 
   console.log(data);
   res.send({ message: 'ok' });
-  // const response = await fetch('http://producer:3002/job', {
-  //   method: 'post',
-  //   body: data,
-  //   headers: { 'Content-Type': 'application/json' },
-  // });
+  const response = await fetch('http://producer:3002/job', {
+    method: 'post',
+    body: data,
+    headers: { 'Content-Type': 'application/json' },
+  });
 });
 
 // app.get('/calculate_projection', async (req, res) => {
