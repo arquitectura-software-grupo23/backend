@@ -248,6 +248,26 @@ app.listen(port, () => {
 });
 
 
+app.get('/requestProjection/:symbol', async (req, res) => {
+  const symbol = req.params.symbol;
+  const { date } = req.body;
+
+  // Realiza la lógica para obtener valores históricos de la acción 'symbol'
+  // basados en la fecha 'date'
+
+  try {
+    const data = await Stock.find(
+        { createdAt: { $gte: date }, symbol },
+        '-_id -__v -createdAt',
+      ).sort({ createdAt: -1 });
+  } catch (error) {
+    console.log(error);
+    res.send({ error: 'Invalid query params' });
+  }
+});
+
+
+
 // app.get('/calculate_projection', async (req, res) => {
 //   console.log('GET /calculate_projection');
 //   get(cosas);
