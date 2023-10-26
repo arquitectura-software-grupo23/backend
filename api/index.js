@@ -246,3 +246,62 @@ app.get('/users', async (req, res) => {
 app.listen(port, () => {
   console.log(`API INICIADA EN PUERTO ${port}`);
 });
+
+function getPastDate(futureDate) {
+  const pastDate = new Date(futureDate-2*(futureDate-Date.now()));
+  return pastDate;
+}
+
+app.post('/requestProjection/:symbol', async (req, res) => {
+  const symbol = req.params.symbol;
+  const { date } = req.body;
+  var data = [];
+
+  const pastDate = getPastDate(date);
+  try {
+    data = await Stock.find(
+        { createdAt: { $gte: pastDate }, symbol },
+        '-_id -__v -createdAt',
+      ).sort({ createdAt: -1 });
+  } catch (error) {
+    console.log(error);
+    res.send({ error: 'Invalid query params' });
+  }
+
+  console.log(data);
+  res.send({ message: 'ok' });
+  const response = await fetch('http://producer:3002/job', {
+    method: 'post',
+    body: data,
+    headers: { 'Content-Type': 'application/json' },
+  });
+});
+
+// app.get('/calculate_projection', async (req, res) => {
+//   console.log('GET /calculate_projection');
+//   get(cosas);
+
+//   axios.post('http://localhost:5000/job').then((response) => {
+//     body = cosas;
+//     console.log(response);
+//     id = response.id
+//   });
+
+//   projection = new.Projection({user_id = user_id, id = id, data = body.data})
+//   db.save(projection);
+//   res.send(ok);
+// });
+
+// app.post('/projection', async (req, res) => {
+//   console.log('POST /projection');
+//   post(req.body);
+  
+//   projection = Projection.findOne({id = req.body.id})
+//   projection.update({data = req.body.data})
+// });
+
+// app.get('/projection', async (req, res) => {
+//   console.log('GET /projection');
+//   res.send(projection)
+//   projection = Projection.findAll({user_id = req.user_id})
+// });
