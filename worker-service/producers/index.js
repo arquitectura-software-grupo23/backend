@@ -15,6 +15,7 @@ app.use(express.json());
 
 app.post('/job', async (req, res) => {
   try {
+    console.log('Received new job request')
     const id = await jobQueue.getNewJobId();
     
     await jobQueue.add('regression', req.body, { jobId: id });

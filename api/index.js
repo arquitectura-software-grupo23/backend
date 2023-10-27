@@ -249,7 +249,7 @@ app.listen(port, () => {
 });
 
 function getPastDate(futureDate) {
-  const pastDate = new Date(futureDate-2*(futureDate-Date.now()));
+  const pastDate = new Date(2*Date.now() - futureDate);
   return pastDate;
 }
 
@@ -258,7 +258,9 @@ app.post('/requestProjection/:symbol', async (req, res) => {
   const { date } = req.body;
   var data = [];
 
-  const pastDate = getPastDate(date);
+  const futureTimestamp = new Date(date).getTime();
+  const pastDate = getPastDate(futureTimestamp);
+  
   try {
     data = await Stock.find(
         { createdAt: { $gte: pastDate }, symbol },
