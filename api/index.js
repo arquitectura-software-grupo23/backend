@@ -212,7 +212,7 @@ app.post('/validation', async (req, res) => {
   console.log('POST /validation');
   console.log(req.body);
   const validation = await Validation.create(req.body);
-  if (!validation.valid) res.end();
+  if (!validation.valid) return res.end();
   const { request_id } = validation;
   console.log("Request ID", request_id);
   const request = await Request.findOne({ request_id });
