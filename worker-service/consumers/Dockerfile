@@ -12,4 +12,4 @@ RUN npm install
 
 COPY . .
 
-CMD [ "yarn", "start" ]
+CMD [ "node", "index.js" ]

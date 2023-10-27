@@ -248,8 +248,7 @@ app.listen(port, () => {
 });
 
 function getPastDate(futureDate) {
-  const pastDate = new Date();
-  pastDate.setTime(futureDate - (Date.now() - futureDate));
+  const pastDate = new Date(2*Date.now() - futureDate);
   return pastDate;
 }
 
@@ -258,7 +257,37 @@ app.post('/requestProjection/:symbol', async (req, res) => {
   const { date } = req.body;
   var data = [];
 
-  const pastDate = getPastDate(date);
+  function getPastDate(futureDate) {
+    const pastDate = new Date(2*Date.now() - futureDate);
+    return pastDate;
+  }
+  
+  app.post('/requestProjection/:symbol', async (req, res) => {
+    const symbol = req.params.symbol;
+    const { date } = req.body;
+    var data = [];
+  
+    const futureTimestamp = new Date(date).getTime();
+    const pastDate = getPastDate(futureTimestamp);
+
+    try {
+      data = await Stock.find(
+          { createdAt: { $gte: pastDate }, symbol },
+          '-_id -__v -createdAt',
+        ).sort({ createdAt: -1 });
+    } catch (error) {
+      console.log(error);
+      res.send({ error: 'Invalid query params' });
+    }
+  
+    console.log(data);
+    res.send({ message: 'ok' });
+    const response = await fetch('http://producer:3002/job', {
+      method: 'post',
+      body: data,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  });
   try {
     data = await Stock.find(
         { createdAt: { $gte: pastDate }, symbol },
@@ -271,11 +300,11 @@ app.post('/requestProjection/:symbol', async (req, res) => {
 
   console.log(data);
   res.send({ message: 'ok' });
-  // const response = await fetch('http://producer:3002/job', {
-  //   method: 'post',
-  //   body: data,
-  //   headers: { 'Content-Type': 'application/json' },
-  // });
+  const response = await fetch('http://producer:3002/job', {
+    method: 'post',
+    body: data,
+    headers: { 'Content-Type': 'application/json' },
+  });
 });
 
 // app.get('/calculate_projection', async (req, res) => {
