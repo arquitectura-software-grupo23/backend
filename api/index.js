@@ -212,6 +212,7 @@ app.post('/validation', async (req, res) => {
   console.log('POST /validation');
   console.log(req.body);
   const validation = await Validation.create(req.body);
+  if (validation.group_id !== '23') return res.end();
   if (!validation.valid) return res.end();
   const { request_id } = validation;
   console.log("Request ID", request_id);

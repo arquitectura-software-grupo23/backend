@@ -37,16 +37,14 @@ client.on('message', async (topic, message) => {
     console.log('Message from: Validation');
     console.log(message.toString());
     const parsedJson = JSON.parse(message);
-    if (parsedJson.group_id === 23) {
-      try {
-        const response = await fetch('http://api:3000/validation', {
-          method: 'post',
-          body: JSON.stringify(parsedJson),
-          headers: { 'Content-Type': 'application/json' },
-        });
-      } catch (error) {
-        console.log('Error in topic socks/validation: ', error);
-      }
+    try {
+      const response = await fetch('http://api:3000/validation', {
+        method: 'post',
+        body: JSON.stringify(parsedJson),
+        headers: { 'Content-Type': 'application/json' },
+      });
+    } catch (error) {
+      console.log('Error in topic socks/validation: ', error);
     }
   }
 });
