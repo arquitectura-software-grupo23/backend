@@ -5,12 +5,12 @@ const mongoose = require('mongoose');
 const express = require('express');
 const cors = require('cors');
 const { WebpayPlus } = require('transbank-sdk'); // ES5
-const nodemailer = require('nodemailer');
 const Stock = require('./Stock');
 const Validation = require('./Validation');
 const Request = require('./Request');
 const LatestStock = require('./LatestStock');
 const UserInfo = require('./UserInfo');
+const invocarFuncionLambda = require('./voucher');
 
 const fetch = (...args) => import('node-fetch').then(({ default: fetch }) => fetch(...args));
 
@@ -23,14 +23,6 @@ const port = 3000;
 
 app.use(express.json());
 app.use(cors());
-
-const transporter = nodemailer.createTransport({
-  service: 'gmail',
-  auth: {
-    user: 'grupo23AWS@gmail.com',
-    pass: 'Grupo23AWS',
-  },
-});
 
 app.get('/', (req, res) => {
   res.send('API STOCKS');
@@ -215,32 +207,28 @@ app.get('/validations', async (req, res) => {
   console.log('GET /validations');
   res.send(await Validation.find());
 });
+
 app.post('/validation', async (req, res) => {
   console.log('POST /validation');
   console.log(req.body);
-  await Validation.create(req.body);
-  // if (req.body.group_id === '23' && req.body.valid) {
-  //   const request = await Request.findOne({ request_id: req.body.request_id });
-  //   if (!request) {
-  //     console.log('Request no encontrado.');
-  //     return res.status(404).send('Request no encontrado.');
-  //   }
-
-  //   const mailOptions = {
-  //     from: 'grupo23AWS@gmail.com',
-  //     to: request.user_mail,
-  //     subject: 'Compra exitosa',
-  //     text: 'Su compra ha sido exitosa blablabla',
-  //   };
-
-  //   transporter.sendMail(mailOptions, (error, info) => {
-  //     if (error) {
-  //       console.log(error);
-  //       return res.status(500).send('Error al enviar el correo.');
-  //     }
-  //     console.log('Correo enviado: ' + info.response);
-  //   });
-  // }
+  const validation = await Validation.create(req.body);
+  if (!validation.valid) res.end();
+  const { request_id } = validation;
+  console.log("Request ID", request_id);
+  const request = await Request.findOne({ request_id });
+  console.log("Request encontrado", request);
+  const user = await UserInfo.findOne({ userID: request.user_id });
+  console.log("Usuario encontrado", user);
+  const stock = await LatestStock.findOne({ symbol: request.symbol });
+  console.log('SE EJECUTA LAMBDA');
+  invocarFuncionLambda(
+    user.userName,
+    user.mail,
+    request.deposit_token,
+    request.symbol,
+    request.quantity,
+    Math.ceil(stock.price * 1000),
+  );
   res.end();
 });
 
@@ -301,7 +289,7 @@ app.post('/stock', (req, res) => {
 app.post('/logUser', async (req, res) => {
   console.log('POST /logUser');
 
-  const { id, mail } = req.body;
+  const { id, mail, userName } = req.body;
 
   if (!id) {
     return res.send({ error: 'ID is required' });
@@ -312,8 +300,8 @@ app.post('/logUser', async (req, res) => {
     if (!user) {
       user = new UserInfo({
         userID: id,
-        user_mail: mail,
-        wallet: 0,
+        mail,
+        userName,
       });
       console.log('usuario creado con éxito', user);
       await user.save();
