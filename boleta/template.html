@@ -1,0 +1,43 @@
+<html>
+    <head>
+        <title>Boleta</title>
+        <style>
+            body {
+                font-family: Arial, sans-serif;
+                padding: 20px;
+                color: #333;
+            }
+            .header {
+                text-align: center;
+                margin-bottom: 50px;
+                position: relative;
+            }
+            .header img {
+                position: absolute;
+                top: 0px;
+                right: 20px;
+                width: 100px;
+            }                
+            .info-section {
+                margin-bottom: 40px;
+                border-bottom: 1px solid #eaeaea;
+                padding-bottom: 20px;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="header">
+            <img src="data:image/png;base64,{{image}}" alt="Logo">
+            <h2>Boleta de Stocknet (Grupo 23)</h2>
+        </div>
+        <div class="info-section">
+            <strong>Datos del Usuario:</strong>
+            <p>Nombre: {{userData.name}}</p>
+            <p>Email: {{userData.email}}</p>
+        </div>
+        <div class="info-section">
+            <strong>Información de Stock:</strong>
+            <p>{{stock.name}} - Cantidad: {{stock.quantity}} - Precio: {{stock.price}}</p>
+        </div>
+    </body>
+</html>
