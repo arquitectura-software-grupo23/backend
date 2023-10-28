@@ -14,13 +14,14 @@ const jobQueue = new Queue('regression-processing', {
 app.use(express.json());
 
 app.post('/job', async (req, res) => {
+  console.log('Received new job request');
+  let jobId;
   try {
-    console.log('Received new job request')
-    const id = await jobQueue.getNewJobId();
-    
-    await jobQueue.add('regression', req.body, { jobId: id });
-    
-    res.status(201).send({ jobId: id });
+    console.log(req.body);
+    const job = await jobQueue.add('regression', req.body);
+    jobId = job.id;
+
+    res.status(201).send({ jobId });
   } catch (error) {
     console.error(error);
     res.status(500).send('Internal server error');

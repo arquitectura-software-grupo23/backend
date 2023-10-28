@@ -32,7 +32,8 @@ function performLinearRegression(dataset) {
  */
 
 async function processor(job) {
-  const dataset = job.data.dataset;
+  const dataset = job.data;
+  return dataset;
 
   if (!Array.isArray(dataset) || dataset.length === 0) {
     throw Error("Invalid dataset provided");
@@ -62,7 +63,8 @@ const worker = new Worker("regression processing", processor, {
 console.log("Worker Listening to Jobs...");
 
 worker.on("completed", (job, returnValue) => {
-  console.log(`Worker completed job ${job.id} with result: ${returnValue}`);
+  console.log('worker got this info');
+  console.log(returnValue);
 });
 
 worker.on("failed", (job, error) => {

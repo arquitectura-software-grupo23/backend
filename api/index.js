@@ -192,7 +192,6 @@ app.post('/stock', (req, res) => {
     await LatestStock.findOneAndUpdate({ symbol: stock.symbol }, stock, {
       upsert: true,
     });
-    console.log(stock)
   });
   res.end();
 });
@@ -253,9 +252,18 @@ function getPastDate(futureDate) {
   return pastDate;
 }
 
+function mapDataForRegression(data) {
+  return data.map(entry => {
+    return [
+      new Date(entry.updatedAt).getTime(),
+      entry.price
+    ];
+  });
+}
+
 app.post('/requestProjection/:symbol', async (req, res) => {
   const symbol = req.params.symbol;
-  const { date } = req.body;
+  const { userId, date } = req.body;
   var data = [];
 
   const futureTimestamp = new Date(date).getTime();
@@ -271,13 +279,23 @@ app.post('/requestProjection/:symbol', async (req, res) => {
     res.send({ error: 'Invalid query params' });
   }
 
-  console.log(data);
   res.send({ message: 'ok' });
   const response = await fetch('http://producer:3002/job', {
     method: 'post',
-    body: data,
+    body: JSON.stringify(mapDataForRegression(data)),
     headers: { 'Content-Type': 'application/json' },
   });
+  if (response.status === 201) {
+    const responseBody = await response.json();
+    const jobId = responseBody.jobId;
+    console.log('Job ID:', jobId);
+  } else {
+    console.error('Failed to create a job:', response.status, await response.text());
+  }
+  
+  //   projection = new.Projection({user_id = userId, id = id, data = body.data})
+  //   db.save(projection);
+  //   res.send(ok);
 });
 
 // app.get('/calculate_projection', async (req, res) => {
