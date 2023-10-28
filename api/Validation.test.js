@@ -35,7 +35,10 @@ describe('Validation Model Test', () => {
 
   it('should not save a Validation instance with invalid data', async () => {
     const validation = new Validation({
-      // Invalid data here (e.g., missing required fields)
+        // Missing required field 'request_id'
+        group_id: 'testGroup',
+        seller: 100,
+        valid: true,
     });
 
     // Use a try-catch block to handle the validation error
