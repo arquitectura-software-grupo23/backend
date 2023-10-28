@@ -40,7 +40,7 @@ async function processor(job) {
 
   
   const duration = dataset[0].timestamp - dataset[dataset.length-1].timestamp;
-const targetDate = Date.now() + duration;
+  const targetDate = Date.now() + duration;
 
 
   console.log("Job received", dataset)
@@ -58,12 +58,6 @@ const targetDate = Date.now() + duration;
 
 
   console.log("Projected Price:", projectedPrice);
-  let targetProjection = null;
-    if (projectedPrice.length > 0) {
-      targetProjection = regressionResult.projections.reduce((latest, current) => {
-        console.log( current.timestamp > latest.timestamp ? current : latest);
-      });
-    }
 
   await axios.put(`http://api:3000/updateRegressionEntry/${job.id}`, {
     projections: projectedPrice,
