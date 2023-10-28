@@ -32,7 +32,8 @@ function performLinearRegression(dataset) {
  */
 
 async function processor(job) {
-  const dataset = job.data.dataset;
+  const dataset = job.data;
+  console.log("Job received", dataset)
 
   if (!Array.isArray(dataset) || dataset.length === 0) {
     throw Error("Invalid dataset provided");
@@ -54,7 +55,7 @@ const connection = {
   password: process.env.REDIS_PASSWORD,
 };
 
-const worker = new Worker("regression processing", processor, {
+const worker = new Worker("regression-processing", processor, {
   autorun: false,
   connection,
 });

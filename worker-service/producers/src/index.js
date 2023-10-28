@@ -16,7 +16,7 @@ app.use(express.json());
 app.post('/job', async (req, res) => {
   try {
     console.log("request received", req.body)
-    const job = await jobQueue.add('regression', req.body);  // No need to set jobId manually
+    const job = await jobQueue.add('regression', req.body);
     
     res.status(201).send({ jobId: job.id });
   } catch (error) {

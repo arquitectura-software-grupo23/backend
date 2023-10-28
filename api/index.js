@@ -6,7 +6,7 @@ const Validation = require('./Validation');
 const Request = require('./Request');
 const LatestStock = require('./LatestStock');
 const UserInfo = require('./UserInfo');
-const RegressionResult = require('./Regresssion')
+const RegressionResult = require('./Regression')
 
 const fetch = (...args) => import('node-fetch').then(({ default: fetch }) => fetch(...args));
 
@@ -254,6 +254,15 @@ function getPastDate(futureDate) {
   return pastDate;
 }
 
+function mapDataForRegression(data) {
+  return data.map(entry => {
+    return [
+      new Date(entry.updatedAt).getTime(),
+      entry.price
+    ];
+  });
+}
+
 app.post('/requestProjection/:symbol', async (req, res) => {
   const symbol = req.params.symbol;
   const { date, userId } = req.body;
@@ -261,6 +270,7 @@ app.post('/requestProjection/:symbol', async (req, res) => {
 
   const futureTimestamp = new Date(date).getTime();
   const pastDate = getPastDate(futureTimestamp);
+
   try {
     data = await Stock.find(
         { createdAt: { $gte: pastDate }, symbol },
@@ -270,24 +280,28 @@ app.post('/requestProjection/:symbol', async (req, res) => {
     console.log(error);
     return res.send({ error: 'Invalid query params' });
   }
-
+  const dataset = JSON.stringify(mapDataForRegression(data))
   const response = await fetch('http://producer:3002/job', {
     method: 'post',
-    body: JSON.stringify(data),
+    body: dataset,
     headers: { 'Content-Type': 'application/json' },
   });
   
   const { jobId } = await response.json();
 
   // Store the initial regression entry in the database
+  
   const regressionEntry = new RegressionResult({
     jobId: jobId,
     userId: userId,
-    originalDataset: data,
+    symbol: symbol,
+    originalDataset: mapDataForRegression(data),
     projections: []  // Empty initially, will be updated by the consumer
   });
 
   try {
+    console.log("Storing regression into database")
+    console.log("Original Dataset:", regressionEntry.originalDataset);
     await regressionEntry.save();
     res.send({ message: 'Regression requested successfully', jobId: jobId });
   } catch (error) {
