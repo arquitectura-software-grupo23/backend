@@ -1,3 +1,4 @@
+/* eslint-disable no-console */
 const mqtt = require('mqtt');
 const express = require('express');
 const cors = require('cors');
@@ -35,17 +36,15 @@ client.on('message', async (topic, message) => {
   if (topic === 'stocks/validation') {
     console.log('Message from: Validation');
     console.log(message.toString());
-    parsedJson = JSON.parse(message);
-    if (parsedJson.group_id === 23) {
-      try {
-        const response = await fetch('http://api:3000/validation', {
-          method: 'post',
-          body: JSON.stringify(parsedJson),
-          headers: { 'Content-Type': 'application/json' },
-        });
-      } catch (error) {
-        console.log('Error in topic socks/validation: ', error);
-      }
+    const parsedJson = JSON.parse(message);
+    try {
+      const response = await fetch('http://api:3000/validation', {
+        method: 'post',
+        body: JSON.stringify(parsedJson),
+        headers: { 'Content-Type': 'application/json' },
+      });
+    } catch (error) {
+      console.log('Error in topic socks/validation: ', error);
     }
   }
 });
@@ -61,19 +60,16 @@ app.get('/', (req, res) => {
 });
 
 app.post('/request', async (req, res) => {
-  // req.body
-  // {
-  //   "request_id": uuid,
-  //   "group_id": string (número de grupo),
-  //   "symbol": string,
-  //   "datetime": string,
-  //   "deposit_token": "",
-  //   "quantity": number,
-  //   "seller": 0
-  // }
   console.log('POST request');
   console.log(req.body);
   client.publish('stocks/requests', JSON.stringify(req.body));
+  res.end();
+});
+
+app.post('/validation', async (req, res) => {
+  console.log('POST validation');
+  console.log(req.body);
+  client.publish('stocks/validation', JSON.stringify(req.body));
   res.end();
 });
 
