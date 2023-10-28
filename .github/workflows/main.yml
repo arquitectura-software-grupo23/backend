@@ -1,0 +1,31 @@
+name: Test and Lint Workflow
+
+on:
+  pull_request:
+    branches:
+      - main # Adjust this to match your main branch name
+
+jobs:
+  test-and-lint:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: "18"
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Test with npm
+        run: npm test
+
+      - name: Lint with npm
+        run: npm run lint
+
+      - name: Dummy Action
+        run: echo "Hello, world!"
