@@ -10,6 +10,7 @@ const regressionResultSchema = new mongoose.Schema({
   jobId: String,
   userId: String,
   symbol: String,
+  projection_len: Number,
   originalDataset: [dataPointSchema],
   projections: [dataPointSchema],      
 }, { timestamps: true });

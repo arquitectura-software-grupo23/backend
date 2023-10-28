@@ -193,7 +193,6 @@ app.post('/stock', (req, res) => {
     await LatestStock.findOneAndUpdate({ symbol: stock.symbol }, stock, {
       upsert: true,
     });
-    console.log(stock)
   });
   res.end();
 });
@@ -271,6 +270,8 @@ app.post('/requestProjection/:symbol', async (req, res) => {
 
   const futureTimestamp = new Date(date).getTime();
   const pastDate = getPastDate(futureTimestamp);
+  console.log("requesting regression for", symbol)
+  console.log("target date:", date)
 
   try {
     data = await Stock.find(
@@ -297,12 +298,12 @@ app.post('/requestProjection/:symbol', async (req, res) => {
     userId: userId,
     symbol: symbol,
     originalDataset: mapDataForRegression(data),
-    projections: []  // Empty initially, will be updated by the consumer
+    projections: [],
+    projection_len: 0  // Empty initially, will be updated by the consumer
   });
 
   try {
     console.log("Storing regression into database")
-    console.log("Original Dataset:", regressionEntry.originalDataset);
     await regressionEntry.save();
     res.send({ message: 'Regression requested successfully', jobId: jobId });
   } catch (error) {
@@ -316,13 +317,13 @@ app.post('/requestProjection/:symbol', async (req, res) => {
 app.put('/updateRegressionEntry/:jobId', async (req, res) => {
   const jobId = req.params.jobId;
   const { projections } = req.body;
-  console.log("Received Projections:", projections);
+  console.log("Received Projections:");
 
 
   try {
     await RegressionResult.findOneAndUpdate(
       { jobId: jobId },
-      { $set: { projections: projections } },
+      { $set: { projections: projections, projection_len: projections.length} },
     );
     res.send({ message: 'Regression entry updated successfully' });
   } catch (error) {
@@ -336,12 +337,37 @@ app.get('/getRegressionResult/:jobId', async (req, res) => {
 
   try {
     const regressionResult = await RegressionResult.findOne({ jobId: jobId });
-    res.send(regressionResult);
+
+
+    if (!regressionResult) {
+      return res.status(404).send({ error: 'No regression result found for the given jobId' });
+    }
+
+    // Extract the target projection (furthest into the future)
+    let targetProjection = null;
+    if (regressionResult.projections && regressionResult.projections.length > 0) {
+      targetProjection = regressionResult.projections.reduce((latest, current) => {
+        return current.timestamp > latest.timestamp ? current : latest;
+      });
+    }
+
+    // Construct the response object without originalDataset and projections
+    const responseObject = {
+      ...regressionResult._doc,  // Spread the original document
+      originalDataset: undefined,  // Remove originalDataset
+      projections: undefined,  // Remove projections
+      targetProjection: targetProjection, // Add target projection
+    };
+
+    console.log(responseObject.symbol)
+
+    res.send(responseObject);
   } catch (error) {
     console.log(error);
     res.send({ error: 'Failed to retrieve regression result' });
   }
 });
+
 
 app.get('/regressioncandle/:jobId', async (req, res) => {
   console.log('GET /regressioncandle/:jobId', req.params);
@@ -387,5 +413,18 @@ app.get('/regressioncandle/:jobId', async (req, res) => {
   } catch (error) {
     console.error(error);
     res.status(500).send({ error: 'Error fetching regression candlestick data' });
+  }
+});
+
+app.get('/getAllRegressions/:userId', async (req, res) => {
+  const userId = req.params.userId;
+
+  try {
+    const regressionResults = await RegressionResult.find({ userId: userId }, 'jobId').sort({ createdAt: -1 });
+    const jobIds = regressionResults.map(result => result.jobId);
+    res.send({ jobIds: jobIds });
+  } catch (error) {
+    console.log(error);
+    res.send({ error: 'Failed to retrieve regression requests for the user' });
   }
 });
