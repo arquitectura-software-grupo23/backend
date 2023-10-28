@@ -8,24 +8,20 @@ function performLinearRegression(dataset) {
   const regression = linearRegression(dataset);
   const projections = [];
 
-  let currentTimestamp = dataset[dataset.length - 1].timestamp;
+  let currentTimestamp = Date.now();
   for (let i = 0; i < dataset.length; i++) {
     currentTimestamp += 5 * minutes;
     const projectedValue = regression.m * currentTimestamp + regression.b;
 
     projections.push({ 
-      createdAt: currentTimestamp, 
-      price: projectedValue,
+      timestamp: currentTimestamp, 
+      value: projectedValue,
     });
   }
 
-  const result = {
-    originalDataset: dataset,
-    projections: projections
-  };
-
-  return result;
+  return projections;
 }
+
 
 /**
  * @param {Job} job
@@ -36,18 +32,27 @@ async function processor(job) {
   console.log("Job received", dataset)
 
   if (!Array.isArray(dataset) || dataset.length === 0) {
+    console.log("cagastexd")
     throw Error("Invalid dataset provided");
   }
 
-  const projectedPrice = performLinearRegression(dataset);
+  // Transform the dataset to the expected format
+  const transformedDataset = dataset.map(entry => [entry.timestamp, entry.value]);
 
-  await axios.post('http://api:3000/projection', {
-    jobId: job.id,
-    result: projectedPrice,
-  });
+  const projectedPrice = performLinearRegression(transformedDataset);
+
+
+  console.log("Projected Price:", projectedPrice);
+
+  await axios.put(`http://api:3000/updateRegressionEntry/${job.id}`, {
+    projections: projectedPrice,
+});
+
+
 
   return `Linear regression completed: Projected price is ${projectedPrice}`;
 }
+
 
 const connection = {
   host: process.env.REDIS_HOST || "localhost",

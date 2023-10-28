@@ -256,12 +256,13 @@ function getPastDate(futureDate) {
 
 function mapDataForRegression(data) {
   return data.map(entry => {
-    return [
-      new Date(entry.updatedAt).getTime(),
-      entry.price
-    ];
+    return {
+      timestamp: new Date(entry.updatedAt).getTime(),
+      value: entry.price
+    };
   });
 }
+
 
 app.post('/requestProjection/:symbol', async (req, res) => {
   const symbol = req.params.symbol;
@@ -315,11 +316,13 @@ app.post('/requestProjection/:symbol', async (req, res) => {
 app.put('/updateRegressionEntry/:jobId', async (req, res) => {
   const jobId = req.params.jobId;
   const { projections } = req.body;
+  console.log("Received Projections:", projections);
+
 
   try {
     await RegressionResult.findOneAndUpdate(
       { jobId: jobId },
-      { projections: projections }
+      { $set: { projections: projections } },
     );
     res.send({ message: 'Regression entry updated successfully' });
   } catch (error) {
@@ -337,5 +340,52 @@ app.get('/getRegressionResult/:jobId', async (req, res) => {
   } catch (error) {
     console.log(error);
     res.send({ error: 'Failed to retrieve regression result' });
+  }
+});
+
+app.get('/regressioncandle/:jobId', async (req, res) => {
+  console.log('GET /regressioncandle/:jobId', req.params);
+
+  const { jobId } = req.params;
+
+  try {
+    const regressionData = await RegressionResult.findOne({ jobId: jobId });
+
+    if (!regressionData || !regressionData.projections || regressionData.projections.length === 0) {
+      return res.status(404).send({ error: 'No regression data found for the given jobId' });
+    }
+
+    const timestamps = regressionData.projections.map(p => p.timestamp);
+    const minTimestamp = Math.min(...timestamps);
+    const maxTimestamp = Math.max(...timestamps);
+
+    // Determine the interval for grouping based on 50 candles
+    const groupInterval = (maxTimestamp - minTimestamp) / 50;
+
+    // Group the projections into candles
+    const groupedProjections = regressionData.projections.reduce((acc, curr) => {
+      const groupId = Math.floor((curr.timestamp - minTimestamp) / groupInterval);
+      if (!acc[groupId]) {
+        acc[groupId] = {
+          high: curr.value,
+          low: curr.value,
+          open: curr.value,
+          close: curr.value,
+          candleTimeStamp: groupId * groupInterval + minTimestamp,
+        };
+      } else {
+        acc[groupId].high = Math.max(acc[groupId].high, curr.value);
+        acc[groupId].low = Math.min(acc[groupId].low, curr.value);
+        acc[groupId].close = curr.value;
+      }
+      return acc;
+    }, {});
+
+    const candleData = Object.values(groupedProjections).sort((a, b) => a.candleTimeStamp - b.candleTimeStamp);
+
+    res.send({ data: candleData });
+  } catch (error) {
+    console.error(error);
+    res.status(500).send({ error: 'Error fetching regression candlestick data' });
   }
 });
