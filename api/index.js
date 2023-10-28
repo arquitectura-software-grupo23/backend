@@ -6,6 +6,7 @@ const Validation = require('./Validation');
 const Request = require('./Request');
 const LatestStock = require('./LatestStock');
 const UserInfo = require('./UserInfo');
+const RegressionResult = require('./Regresssion')
 
 const fetch = (...args) => import('node-fetch').then(({ default: fetch }) => fetch(...args));
 
@@ -255,10 +256,11 @@ function getPastDate(futureDate) {
 
 app.post('/requestProjection/:symbol', async (req, res) => {
   const symbol = req.params.symbol;
-  const { date } = req.body;
+  const { date, userId } = req.body;
   var data = [];
 
-  const pastDate = getPastDate(date);
+  const futureTimestamp = new Date(date).getTime();
+  const pastDate = getPastDate(futureTimestamp);
   try {
     data = await Stock.find(
         { createdAt: { $gte: pastDate }, symbol },
@@ -266,43 +268,60 @@ app.post('/requestProjection/:symbol', async (req, res) => {
       ).sort({ createdAt: -1 });
   } catch (error) {
     console.log(error);
-    res.send({ error: 'Invalid query params' });
+    return res.send({ error: 'Invalid query params' });
   }
 
-  console.log(data);
-  res.send({ message: 'ok' });
   const response = await fetch('http://producer:3002/job', {
     method: 'post',
-    body: data,
+    body: JSON.stringify(data),
     headers: { 'Content-Type': 'application/json' },
   });
+  
+  const { jobId } = await response.json();
+
+  // Store the initial regression entry in the database
+  const regressionEntry = new RegressionResult({
+    jobId: jobId,
+    userId: userId,
+    originalDataset: data,
+    projections: []  // Empty initially, will be updated by the consumer
+  });
+
+  try {
+    await regressionEntry.save();
+    res.send({ message: 'Regression requested successfully', jobId: jobId });
+  } catch (error) {
+    console.log(error);
+    res.send({ error: 'Failed to store regression entry' });
+  }
 });
 
-// app.get('/calculate_projection', async (req, res) => {
-//   console.log('GET /calculate_projection');
-//   get(cosas);
 
-//   axios.post('http://localhost:5000/job').then((response) => {
-//     body = cosas;
-//     console.log(response);
-//     id = response.id
-//   });
 
-//   projection = new.Projection({user_id = user_id, id = id, data = body.data})
-//   db.save(projection);
-//   res.send(ok);
-// });
+app.put('/updateRegressionEntry/:jobId', async (req, res) => {
+  const jobId = req.params.jobId;
+  const { projections } = req.body;
 
-// app.post('/projection', async (req, res) => {
-//   console.log('POST /projection');
-//   post(req.body);
-  
-//   projection = Projection.findOne({id = req.body.id})
-//   projection.update({data = req.body.data})
-// });
+  try {
+    await RegressionResult.findOneAndUpdate(
+      { jobId: jobId },
+      { projections: projections }
+    );
+    res.send({ message: 'Regression entry updated successfully' });
+  } catch (error) {
+    console.log(error);
+    res.send({ error: 'Failed to update regression entry' });
+  }
+});
 
-// app.get('/projection', async (req, res) => {
-//   console.log('GET /projection');
-//   res.send(projection)
-//   projection = Projection.findAll({user_id = req.user_id})
-// });
+app.get('/getRegressionResult/:jobId', async (req, res) => {
+  const jobId = req.params.jobId;
+
+  try {
+    const regressionResult = await RegressionResult.findOne({ jobId: jobId });
+    res.send(regressionResult);
+  } catch (error) {
+    console.log(error);
+    res.send({ error: 'Failed to retrieve regression result' });
+  }
+});

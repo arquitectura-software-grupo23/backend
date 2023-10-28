@@ -15,11 +15,10 @@ app.use(express.json());
 
 app.post('/job', async (req, res) => {
   try {
-    const id = await jobQueue.getNewJobId();
+    console.log("request received", req.body)
+    const job = await jobQueue.add('regression', req.body);  // No need to set jobId manually
     
-    await jobQueue.add('regression', req.body, { jobId: id });
-    
-    res.status(201).send({ jobId: id });
+    res.status(201).send({ jobId: job.id });
   } catch (error) {
     console.error(error);
     res.status(500).send('Internal server error');
