@@ -1,0 +1,14 @@
+{
+  "name": "workers",
+  "version": "1.0.0",
+  "main": "index.js",
+  "license": "MIT",
+  "dependencies": {
+    "axios": "^1.6.0",
+    "bullmq": "^3.13.4",
+    "simple-statistics": "^7.8.3"
+  },
+  "scripts": {
+    "start": "node src/index.js"
+  }
+}
