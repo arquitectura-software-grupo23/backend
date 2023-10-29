@@ -1,9 +1,10 @@
 const mongoose = require('mongoose');
-const { v4: uuidv4 } = require('uuid');
+// const { v4: uuidv4 } = require('uuid');
+const { v4 } = require('./uuidc');
 
 const requestSchema = new mongoose.Schema(
   {
-    request_id: { type: String, required: true, default: uuidv4() },
+    request_id: { type: String, required: true, default: v4() },
     group_id: String,
     symbol: String,
     deposit_token: String,
