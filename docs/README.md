@@ -15,11 +15,16 @@
 - `/request` (POST) - Crea una nueva solicitud de usuario.
 - `/validations` (GET) - Obtiene todas las validaciones.
 - `/validation` (POST) - Agrega una nueva validación.
+- `/validate` (POST) - Valida una transacción de Webpay basándose en el token proporcionado y actualiza el estado de la solicitud correspondiente.
 - `/stock` (POST) - Añade datos de una acción.
-- `/logUser` (POST) - Registra un usuario en el sistema.
-- `/addMoney` (POST) - Aumenta el saldo de la cartera de un usuario.
-- `/getMoney/:id` (GET) - Obtiene la cantidad de dinero que tiene un usuario.
+- `/logUser` (POST) - Registra un usuario en el sistema guardando una entrada en la base de datos.
 - `/users` (GET) - Obtiene todos los usuarios.
+- `/requestProjection/:symbol` (POST) - Solicita una proyección de regresión para un símbolo de acción en una fecha futura.
+- `/updateRegressionEntry/:jobId` (PUT) - Actualiza una entrada de regresión con proyecciones.
+- `/getRegressionResult/:jobId` (GET) - Obtiene el resultado de una regresión basándose en el jobId.
+- `/regressioncandle/:jobId` (GET) - Obtiene datos de velas basados en los resultados de regresión.
+- `/getAllRegressions/:userId` (GET) - Obtiene todos los jobIds de regresión para un usuario.
+
 
 ### 2. MQTT (Directorio: `/mqtt`)
 
@@ -38,7 +43,21 @@
 - `/` (GET) - Punto de acceso básico que muestra el estado del servicio.
 - `/request` (POST) - Reenvía una solicitud como un mensaje MQTT publicado.
 
-### 3. NGINX (Directorio: `/nginx`)
+### 3. Workers (Directorio `/workers-service`)
+Usa `bullmq` y `redis` para lograr una implementación de workers. Estos workers son los encargados de calcular las regresiones lineales que los usuarios piden desde el frontend. Esto funciona a traves de un jobmaster (`/workers-service/producers`) que se comunica con el servicio **API** para agregar tareas a una cola. Estas tareas son tomadas por workers (`/workers-service/consumers`) que tienen la responsabilidad de calcular estas regresiones.
+
+### Flujo normal
+1. Al recibir una request desde el frontend la **API** se comunica con el `producer` para generar la tarea y agregarla a la cola.
+2. En ese momento, el producer asigna un id a la regresion y lo devuelve a la **API**, y comanda a uno de los workers a la tarea.
+3. Los workers empiezan a calcular la regresion apenas reciben la orden
+4. Al terminar actualizan los valores de la regresion comunicandose directamente a la **API**.
+
+Este comportamiento permite a los usuarios ver las regresiones apenas las piden, pero solo tendran el resultado una vez que los workers hayan actualizado la entrada correctamente.
+
+### Endpoint producer:
+-  `/job` (POST) Endpoint que recibe ordenes para regresion lineal.
+
+### 4. NGINX (Directorio: `/nginx`)
 
 Este servicio actúa como un proxy inverso, direccionando las solicitudes entrantes desde el puerto de navegacion al puerto correspondiente al servicio API.
 
@@ -52,4 +71,4 @@ Este servicio actúa como un proxy inverso, direccionando las solicitudes entran
 Ejemplo:
 
 ```bash
-docker-compose up --build```
+docker-compose up --build ```
