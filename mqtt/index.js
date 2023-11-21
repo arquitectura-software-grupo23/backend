@@ -44,7 +44,22 @@ client.on('message', async (topic, message) => {
         headers: { 'Content-Type': 'application/json' },
       });
     } catch (error) {
-      console.log('Error in topic socks/validation: ', error);
+      console.log('Error in topic stocks/validation: ', error);
+    }
+  }
+
+  if (topic === 'stocks/auctions') {
+    console.log('Message from: Auctions');
+    console.log(message.toString());
+    const parsedJson = JSON.parse(message);
+    try {
+      const response = await fetch('http://api:3000/auction', {
+        method: 'post',
+        body: JSON.stringify(parsedJson),
+        headers: { 'Content-Type': 'application/json' },
+      });
+    } catch (error) {
+      console.log('Error in topic stocks/auctions: ', error);
     }
   }
 });
@@ -70,6 +85,13 @@ app.post('/validation', async (req, res) => {
   console.log('POST validation');
   console.log(req.body);
   client.publish('stocks/validation', JSON.stringify(req.body));
+  res.end();
+});
+
+app.post('/auction', async (req, res) => {
+  console.log('POST auction');
+  console.log(req.body);
+  client.publish('stocks/auctions', JSON.stringify(req.body));
   res.end();
 });
 

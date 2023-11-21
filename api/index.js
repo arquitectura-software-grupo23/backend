@@ -10,10 +10,12 @@ const Validation = require('./Validation');
 const Request = require('./Request');
 const LatestStock = require('./LatestStock');
 const UserInfo = require('./UserInfo');
-const RegressionResult = require('./Regression')
+const RegressionResult = require('./Regression');
 const invocarFuncionLambda = require('./voucher');
-const fetch = (...args) => import('node-fetch').then(({ default: fetch }) => fetch(...args));
+const Auction = require('./Auction');
 
+const fetch = (...args) => import('node-fetch').then(({ default: fetch }) => fetch(...args));
+const { v4 } = require('./uuidc');
 
 mongoose
   .connect('mongodb://mongo:27017/stocks')
@@ -216,11 +218,11 @@ app.post('/validation', async (req, res) => {
   if (validation.group_id !== '23') return res.end();
   if (!validation.valid) return res.end();
   const { request_id } = validation;
-  console.log("Request ID", request_id);
+  console.log('Request ID', request_id);
   const request = await Request.findOne({ request_id });
-  console.log("Request encontrado", request);
+  console.log('Request encontrado', request);
   const user = await UserInfo.findOne({ userID: request.user_id });
-  console.log("Usuario encontrado", user);
+  console.log('Usuario encontrado', user);
   const stock = await LatestStock.findOne({ symbol: request.symbol });
   console.log('SE EJECUTA LAMBDA');
   invocarFuncionLambda(
@@ -342,81 +344,75 @@ app.listen(port, () => {
 });
 
 function getPastDate(futureDate) {
-  const pastDate = new Date(futureDate-2*(futureDate-Date.now()));
+  const pastDate = new Date(futureDate - 2 * (futureDate - Date.now()));
   return pastDate;
 }
 
 function mapDataForRegression(data) {
-  return data.map(entry => {
-    return {
-      timestamp: new Date(entry.updatedAt).getTime(),
-      value: entry.price
-    };
-  });
+  return data.map((entry) => ({
+    timestamp: new Date(entry.updatedAt).getTime(),
+    value: entry.price,
+  }));
 }
 
-
 app.post('/requestProjection/:symbol', async (req, res) => {
-  const symbol = req.params.symbol;
+  const { symbol } = req.params;
   const { date, userId } = req.body;
-  var data = [];
+  let data = [];
 
   const futureTimestamp = new Date(date).getTime();
   const pastDate = getPastDate(futureTimestamp);
-  console.log("requesting regression for", symbol)
-  console.log("target date:", date)
+  console.log('requesting regression for', symbol);
+  console.log('target date:', date);
 
   try {
     data = await Stock.find(
-        { createdAt: { $gte: pastDate }, symbol },
-        '-_id -__v -createdAt',
-      ).sort({ createdAt: -1 });
+      { createdAt: { $gte: pastDate }, symbol },
+      '-_id -__v -createdAt',
+    ).sort({ createdAt: -1 });
   } catch (error) {
     console.log(error);
     return res.send({ error: 'Invalid query params' });
   }
-  const dataset = JSON.stringify(mapDataForRegression(data))
+  const dataset = JSON.stringify(mapDataForRegression(data));
   const response = await fetch('http://producer:3002/job', {
     method: 'post',
     body: dataset,
     headers: { 'Content-Type': 'application/json' },
   });
-  
+
   const { jobId } = await response.json();
 
   // Store the initial regression entry in the database
-  
+
   const regressionEntry = new RegressionResult({
-    jobId: jobId,
-    userId: userId,
-    symbol: symbol,
+    jobId,
+    userId,
+    symbol,
     originalDataset: mapDataForRegression(data),
     projections: [],
-    projection_len: 0  // Empty initially, will be updated by the consumer
+    projection_len: 0, // Empty initially, will be updated by the consumer
   });
 
   try {
-    console.log("Storing regression into database")
+    console.log('Storing regression into database');
     await regressionEntry.save();
-    res.send({ message: 'Regression requested successfully', jobId: jobId });
+    res.send({ message: 'Regression requested successfully', jobId });
   } catch (error) {
     console.log(error);
     res.send({ error: 'Failed to store regression entry' });
   }
 });
 
-
-
 app.put('/updateRegressionEntry/:jobId', async (req, res) => {
-  const jobId = req.params.jobId;
+  const { jobId } = req.params;
   const { projections } = req.body;
-  console.log("Received Projections:");
-
+  console.log('Received Projections:');
 
   try {
     await RegressionResult.findOneAndUpdate(
-      { jobId: jobId },
-      { $set: { projections: projections, projection_len: projections.length} },
+      { jobId },
+      { $set: { projections, projection_len: projections.length } },
     );
     res.send({ message: 'Regression entry updated successfully' });
   } catch (error) {
@@ -426,11 +422,10 @@ app.put('/updateRegressionEntry/:jobId', async (req, res) => {
 });
 
 app.get('/getRegressionResult/:jobId', async (req, res) => {
-  const jobId = req.params.jobId;
+  const { jobId } = req.params;
 
   try {
-    const regressionResult = await RegressionResult.findOne({ jobId: jobId });
-
+    const regressionResult = await RegressionResult.findOne({ jobId });
 
     if (!regressionResult) {
       return res.status(404).send({ error: 'No regression result found for the given jobId' });
@@ -439,20 +434,18 @@ app.get('/getRegressionResult/:jobId', async (req, res) => {
     // Extract the target projection (furthest into the future)
     let targetProjection = null;
     if (regressionResult.projections && regressionResult.projections.length > 0) {
-      targetProjection = regressionResult.projections.reduce((latest, current) => {
-        return current.timestamp > latest.timestamp ? current : latest;
-      });
+      targetProjection = regressionResult.projections.reduce((latest, current) => (current.timestamp > latest.timestamp ? current : latest));
     }
 
     // Construct the response object without originalDataset and projections
     const responseObject = {
-      ...regressionResult._doc,  // Spread the original document
-      originalDataset: undefined,  // Remove originalDataset
-      projections: undefined,  // Remove projections
-      targetProjection: targetProjection, // Add target projection
+      ...regressionResult._doc, // Spread the original document
+      originalDataset: undefined, // Remove originalDataset
+      projections: undefined, // Remove projections
+      targetProjection, // Add target projection
     };
 
-    console.log(responseObject.symbol)
+    console.log(responseObject.symbol);
 
     res.send(responseObject);
   } catch (error) {
@@ -461,20 +454,19 @@ app.get('/getRegressionResult/:jobId', async (req, res) => {
   }
 });
 
-
 app.get('/regressioncandle/:jobId', async (req, res) => {
   console.log('GET /regressioncandle/:jobId', req.params);
 
   const { jobId } = req.params;
 
   try {
-    const regressionData = await RegressionResult.findOne({ jobId: jobId });
+    const regressionData = await RegressionResult.findOne({ jobId });
 
     if (!regressionData || !regressionData.projections || regressionData.projections.length === 0) {
       return res.status(404).send({ error: 'No regression data found for the given jobId' });
     }
 
-    const timestamps = regressionData.projections.map(p => p.timestamp);
+    const timestamps = regressionData.projections.map((p) => p.timestamp);
     const minTimestamp = Math.min(...timestamps);
     const maxTimestamp = Math.max(...timestamps);
 
@@ -510,14 +502,43 @@ app.get('/regressioncandle/:jobId', async (req, res) => {
 });
 
 app.get('/getAllRegressions/:userId', async (req, res) => {
-  const userId = req.params.userId;
+  const { userId } = req.params;
 
   try {
-    const regressionResults = await RegressionResult.find({ userId: userId }, 'jobId').sort({ createdAt: -1 });
-    const jobIds = regressionResults.map(result => result.jobId);
-    res.send({ jobIds: jobIds });
+    const regressionResults = await RegressionResult.find({ userId }, 'jobId').sort({ createdAt: -1 });
+    const jobIds = regressionResults.map((result) => result.jobId);
+    res.send({ jobIds });
   } catch (error) {
     console.log(error);
     res.send({ error: 'Failed to retrieve regression requests for the user' });
   }
+});
+
+app.post('/auction', async (req, res) => {
+  console.log('POST /auction');
+  console.log(req.body);
+  const auction = await Auction.create(req.body);
+});
+
+app.get('/auctions', async (req, res) => {
+  console.log('GET /auctions');
+  console.log(req.body);
+  res.send(await Auction.find());
+});
+
+app.post('/auctions/proposal', async (req, res) => {
+  console.log('POST /auctions/proposal');
+  console.log(req.body);
+  const { auction_id, stock_id, quantity } = req.body;
+  const proposal = {
+    auction_id, proposal_id: v4(), stock_id, quantity, group_id: 23, type: 'proposal',
+  };
+
+  await fetch('http://mqtt:3001/auctions', {
+    method: 'post',
+    body: JSON.stringify(proposal),
+    headers: { 'Content-Type': 'application/json' },
+  });
+
+  res.end();
 });
