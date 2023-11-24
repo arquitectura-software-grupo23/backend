@@ -306,6 +306,7 @@ app.post('/logUser', async (req, res) => {
         userID: id,
         mail,
         userName,
+        isAdmin: false,
       });
       console.log('usuario creado con éxito', user);
       await user.save();
@@ -315,6 +316,16 @@ app.post('/logUser', async (req, res) => {
     return res.send({ error: 'Internal server error' });
   }
 });
+
+
+app.get('/adminCheck', async (req, res) => {
+  console.log('GET /adminCheck');
+
+  const { user_id } = req.query;
+  const user = await UserInfo.findOne({ userID: user_id });
+  res.send({ isAdmin: user.isAdmin });
+});
+
 
 app.post('/addMoney', async (req, res) => {
   console.log('POST /addMoney');
