@@ -220,6 +220,52 @@ app.post('/request', async (req, res) => {
   }
 });
 
+app.post('/groupStockPurchase', async (req, res) => {
+  console.log('POST /groupStockPurchase');
+
+  try {
+    const {
+      group_id, symbol, quantity, user_id, user_ip, user_location, seller,
+    } = req.body;
+
+    const groupStock = await GroupStock.findOne({ symbol });
+    
+    if(!groupStock || groupStock.amount < quantity) {
+      return res.send({ "error": 'Not enough stock available' });
+    }
+
+    const newAmount = groupStock.amount -= quantity;
+    await groupStock.updateOne({ symbol }, { amount: newAmount });
+
+    const request = await Request.create({
+      group_id,
+      symbol,
+      quantity,
+      seller,
+      user_id,
+      user_ip,
+      user_location,
+    });
+
+    const {
+      request_id,
+    } = request;
+
+    const stock = await LatestStock.findOne({ symbol });
+    console.log(user_id, stock.price);
+    // await UserInfo.updateOne({ userID: user_id }, { $inc: { wallet: stock.price * -1 } });
+
+    const transaction = await createTransbankTransaction(quantity * stock.price);
+    console.log(await Request.findOne({ request_id }));
+    await Request.updateOne({ request_id }, { deposit_token: transaction.token });
+
+    res.send(transaction);
+  } catch (error) {
+    return res.send({ error: 'Failed to buy stock' });
+  }
+
+});
+
 app.get('/validations', async (req, res) => {
   console.log('GET /validations');
   res.send(await Validation.find());
@@ -277,6 +323,12 @@ app.post('/validate', async (req, res) => {
   }
 
   const request = await Request.findOne({ deposit_token: req.body.TBK_TOKEN || req.body.token_ws });
+
+  const stockSymbol = request.symbol;
+  const stockQuantity = request.quantity;
+
+  addGroupStock(stockSymbol, stockQuantity);
+
   console.log(request);
 
   await fetch('http://mqtt:3001/validation', {
