@@ -162,7 +162,7 @@ const createTransbankTransaction = async (price) => {
     'ID',
     'ID',
     Math.ceil(price * 1000),
-    'https://frontend.stocknet.me/validate',
+    'http://localhost:5173/validate',
   );
 
   return transaction;
@@ -222,19 +222,17 @@ app.post('/request', async (req, res) => {
 
 app.post('/groupStockPurchase', async (req, res) => {
   console.log('POST /groupStockPurchase');
-
   try {
     const {
       group_id, symbol, quantity, user_id, user_ip, user_location, seller,
     } = req.body;
 
     const groupStock = await GroupStock.findOne({ symbol });
-    
-    if(!groupStock || groupStock.amount < quantity) {
-      return res.send({ "error": 'Not enough stock available' });
+    if (!groupStock || groupStock.amount < quantity) {
+      return res.send({ error: 'Not enough stock available' });
     }
 
-    const newAmount = groupStock.amount -= quantity;
+    const newAmount = groupStock.amount - quantity;
     await groupStock.updateOne({ symbol }, { amount: newAmount });
 
     const request = await Request.create({
@@ -263,7 +261,6 @@ app.post('/groupStockPurchase', async (req, res) => {
   } catch (error) {
     return res.send({ error: 'Failed to buy stock' });
   }
-
 });
 
 app.get('/validations', async (req, res) => {
