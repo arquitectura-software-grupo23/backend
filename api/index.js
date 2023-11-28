@@ -16,6 +16,23 @@ const Auction = require('./Auction');
 const promBundle = require('express-prom-bundle');
 const metricsMiddleware = promBundle({includeMethod: true});
 
+const GroupStock = require('./GroupStock');
+
+async function addGroupStock(symbol, amount) {
+  try {
+    const groupStock = await GroupStock.findOne({ symbol });
+
+    if (!groupStock) {
+      await GroupStock.create({ symbol, amount });
+    } else {
+      const newAmount = groupStock.amount + amount;
+      await GroupStock.updateOne({ symbol }, { amount: newAmount });
+    }
+  } catch (error) {
+    console.log(error);
+  }
+}
+
 const fetch = (...args) => import('node-fetch').then(({ default: fetch }) => fetch(...args));
 const { v4 } = require('./uuidc');
 
@@ -149,7 +166,7 @@ const createTransbankTransaction = async (price) => {
     'ID',
     'ID',
     Math.ceil(price * 1000),
-    'https://frontend.stocknet.me/validate',
+    'http://localhost:5173/validate',
   );
 
   return transaction;
@@ -160,14 +177,14 @@ app.post('/request', async (req, res) => {
 
   try {
     const {
-      symbol, quantity, user_id, user_ip, user_location,
+      group_id, symbol, quantity, user_id, user_ip, user_location, seller,
     } = req.body;
 
     const request = await Request.create({
-      group_id: '23',
+      group_id,
       symbol,
       quantity,
-      seller: '0',
+      seller,
       user_id,
       user_ip,
       user_location,
@@ -175,9 +192,7 @@ app.post('/request', async (req, res) => {
 
     const {
       request_id,
-      group_id,
       createdAt,
-      seller,
     } = request;
 
     const stock = await LatestStock.findOne({ symbol });
@@ -209,6 +224,49 @@ app.post('/request', async (req, res) => {
   }
 });
 
+app.post('/groupStockPurchase', async (req, res) => {
+  console.log('POST /groupStockPurchase');
+  try {
+    const {
+      group_id, symbol, quantity, user_id, user_ip, user_location, seller,
+    } = req.body;
+
+    const groupStock = await GroupStock.findOne({ symbol });
+    if (!groupStock || groupStock.amount < quantity) {
+      return res.send({ error: 'Not enough stock available' });
+    }
+
+    const newAmount = groupStock.amount - quantity;
+    await groupStock.updateOne({ symbol }, { amount: newAmount });
+
+    const request = await Request.create({
+      group_id,
+      symbol,
+      quantity,
+      seller,
+      user_id,
+      user_ip,
+      user_location,
+    });
+
+    const {
+      request_id,
+    } = request;
+
+    const stock = await LatestStock.findOne({ symbol });
+    console.log(user_id, stock.price);
+    // await UserInfo.updateOne({ userID: user_id }, { $inc: { wallet: stock.price * -1 } });
+
+    const transaction = await createTransbankTransaction(quantity * stock.price);
+    console.log(await Request.findOne({ request_id }));
+    await Request.updateOne({ request_id }, { deposit_token: transaction.token });
+
+    res.send(transaction);
+  } catch (error) {
+    return res.send({ error: 'Failed to buy stock' });
+  }
+});
+
 app.get('/validations', async (req, res) => {
   console.log('GET /validations');
   res.send(await Validation.find());
@@ -236,6 +294,12 @@ app.post('/validation', async (req, res) => {
     request.quantity,
     Math.ceil(stock.price * 1000),
   );
+  if (validation.seller === '23') {
+    addGroupStock(request.symbol, request.quantity * -1);
+  }
+  if (validation.seller !== '23') {
+    addGroupStock(request.symbol, request.quantity);
+  }
   res.end();
 });
 
@@ -259,13 +323,13 @@ app.post('/validate', async (req, res) => {
     }
   }
 
-  // hacer endpoint 3001: recibir el status del pago y mandar el validate en mqtt
-  // hacer endpoint 3001: recibir validaciones con listening y mandarlas al 3000 (validation)
-
-  // revisar lo del correo
-  // implementar lo del pdf tanto en back como en front
-
   const request = await Request.findOne({ deposit_token: req.body.TBK_TOKEN || req.body.token_ws });
+
+  const stockSymbol = request.symbol;
+  const stockQuantity = request.quantity;
+
+  addGroupStock(stockSymbol, stockQuantity);
+
   console.log(request);
 
   await fetch('http://mqtt:3001/validation', {
@@ -273,7 +337,7 @@ app.post('/validate', async (req, res) => {
     body: JSON.stringify({
       request_id: request.request_id,
       group_id: 23,
-      seller: 0,
+      seller: req.seller,
       valid,
     }),
     headers: { 'Content-Type': 'application/json' },
@@ -309,6 +373,7 @@ app.post('/logUser', async (req, res) => {
         userID: id,
         mail,
         userName,
+        isAdmin: false,
       });
       console.log('usuario creado con éxito', user);
       await user.save();
@@ -319,22 +384,12 @@ app.post('/logUser', async (req, res) => {
   }
 });
 
-app.post('/addMoney', async (req, res) => {
-  console.log('POST /addMoney');
-  const { id, amount } = req.body;
-  const amountInt = parseInt(amount, 10);
-  try {
-    await UserInfo.updateOne({ userID: id }, { $inc: { wallet: amountInt } });
-  } catch (error) {
-    res.send({ error });
-  }
-  res.end();
-});
+app.get('/adminCheck', async (req, res) => {
+  console.log('GET /adminCheck');
 
-app.get('/getMoney/:id', async (req, res) => {
-  console.log('Get /getMoney');
-  const userId = req.params.id; // Obtener el ID del usuario de los parámetros de la ruta
-  res.send(await UserInfo.find(UserInfo.where('userID').equals(userId)));
+  const { user_id } = req.query;
+  const user = await UserInfo.findOne({ userID: user_id });
+  res.send({ isAdmin: user.isAdmin });
 });
 
 app.get('/users', async (req, res) => {
@@ -521,23 +576,81 @@ app.post('/auction', async (req, res) => {
   console.log('POST /auction');
   console.log(req.body);
   const auction = await Auction.create(req.body);
+
+  if (auction.type === 'acceptance') {
+    const offer = Auction.findOne({ auction_id: auction.auction_id });
+    if (offer.groupId === 23) {
+      addGroupStock(auction.stock_id, auction.quantity * -1);
+    }
+
+    if (auction.group_id === 23) {
+      addGroupStock(auction.stock_id, auction.quantity);
+    }
+  }
+  res.end();
 });
 
-app.get('/auctions', async (req, res) => {
-  console.log('GET /auctions');
+app.get('/auctions', async (req, res) => { res.send(await Auction.find()); });
+
+app.get('/auctions/:type', async (req, res) => {
+  console.log('GET /auctions/:type');
   console.log(req.body);
-  res.send(await Auction.find());
+
+  let { page, size } = req.query;
+  page ??= 1;
+  size ??= 50;
+
+  const { type } = req.params;
+  if (type === 'history') {
+    try {
+      res.send(await Auction.find(
+        { $or: [{ type: { $eq: 'rejection' } }, { type: { $eq: 'acceptance' } }] },
+        '-_id -__v -createdAt',
+      )
+        .sort({ createdAt: -1 })
+        .skip((page - 1) * size)
+        .limit(size));
+    } catch (error) {
+      console.log(error);
+      res.send({ error: 'Invalid query params' });
+    }
+  } else {
+    try {
+      res.send(await Auction.find(
+        { type: { $eq: type } },
+        '-_id -__v -createdAt',
+      )
+        .sort({ createdAt: -1 })
+        .skip((page - 1) * size)
+        .limit(size));
+    } catch (error) {
+      console.log(error);
+      res.send({ error: 'Invalid query params' });
+    }
+  }
 });
 
-app.post('/auctions/proposal', async (req, res) => {
-  console.log('POST /auctions/proposal');
+
+app.post('/auctions/create', async (req, res) => {
+  console.log('POST /auctions/create');
   console.log(req.body);
-  const { auction_id, stock_id, quantity } = req.body;
+  const {
+    auction_id, stock_id, quantity, type,
+  } = req.body;
+
+  let { proposal_id } = req.body;
+  
+  if (proposal_id === 'new') {
+    proposal_id = v4()(); // (.)(.)
+  }
+
   const proposal = {
-    auction_id, proposal_id: v4(), stock_id, quantity, group_id: 23, type: 'proposal',
+    auction_id, proposal_id, stock_id, quantity, group_id: 23, type,
   };
 
-  await fetch('http://mqtt:3001/auctions', {
+  console.log(proposal);
+
+  await fetch('http://mqtt:3001/auction', {
     method: 'post',
     body: JSON.stringify(proposal),
     headers: { 'Content-Type': 'application/json' },
@@ -545,3 +658,27 @@ app.post('/auctions/proposal', async (req, res) => {
 
   res.end();
 });
+
+app.post('/addGroupStock', async (req, res) => {
+  console.log('POST /addGroupStock');
+  console.log(req.body);
+  const { symbol, amount } = req.body;
+  try {
+    const groupStock = GroupStock.findOne();
+
+    if (!groupStock) {
+      await GroupStock.create(
+        { symbol, amount },
+      );
+    } else {
+      const newAmount = groupStock.amount + amount;
+      await GroupStock.updateOne({ symbol }, { amount: newAmount });
+    }
+  } catch (error) {
+    console.log(error);
+    return res.send({ error: 'Invalid query params' });
+  }
+  res.end();
+});
+
+app.get('/groupstock', async (req, res) => { res.send(await GroupStock.find()); });

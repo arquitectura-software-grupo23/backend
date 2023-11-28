@@ -5,6 +5,7 @@ const userInfoSchema = new mongoose.Schema({
   wallet: Number,
   mail: String,
   userName: String,
+  isAdmin: Boolean,
 }, { timestamps: true });
 
 module.exports = mongoose.model('UserInfo', userInfoSchema);

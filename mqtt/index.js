@@ -19,6 +19,7 @@ client.on('connect', () => {
   console.log('Connected to MQTT');
   client.subscribe('stocks/info', () => {});
   client.subscribe('stocks/validation', () => {});
+  client.subscribe('stocks/auctions', () => {});
 });
 
 client.on('message', async (topic, message) => {
@@ -91,7 +92,7 @@ app.post('/validation', async (req, res) => {
 app.post('/auction', async (req, res) => {
   console.log('POST auction');
   console.log(req.body);
-  client.publish('stocks/auctions', JSON.stringify(req.body));
+  client.publish('stocks/auctions1', JSON.stringify(req.body));
   res.end();
 });
 
