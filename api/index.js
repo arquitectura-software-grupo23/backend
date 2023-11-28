@@ -13,6 +13,9 @@ const UserInfo = require('./UserInfo');
 const RegressionResult = require('./Regression');
 const invocarFuncionLambda = require('./voucher');
 const Auction = require('./Auction');
+const promBundle = require('express-prom-bundle');
+const metricsMiddleware = promBundle({includeMethod: true});
+
 const GroupStock = require('./GroupStock');
 
 async function addGroupStock(symbol, amount) {
@@ -42,6 +45,7 @@ const port = 3000;
 
 app.use(express.json());
 app.use(cors());
+app.use(metricsMiddleware);
 
 app.get('/', (req, res) => {
   res.send('API STOCKS');
