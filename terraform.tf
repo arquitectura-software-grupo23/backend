@@ -24,8 +24,9 @@ resource "null_resource" "docker_update" {
   provisioner "remote-exec" {
     # Los comandos que se ejecutan para actualizar el docker-compose.
     inline = [
-      "sudo git pull"
-      "sudo docker-compose build"
+      "sudo git pull",
+      "sudo docker-compose down",
+      "sudo docker-compose build",
       "sudo docker-compose up -d"
     ]
 
