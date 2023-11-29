@@ -169,7 +169,7 @@ const createTransbankTransaction = async (price) => {
     'ID',
     'ID',
     Math.ceil(price * 1000),
-    'http://localhost:5173/validate',
+    'http://frontend.stocknet.me/validate',
   );
 
   return transaction;
