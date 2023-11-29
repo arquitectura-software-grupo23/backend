@@ -674,7 +674,7 @@ app.post('/addGroupStock', async (req, res) => {
         { symbol, amount },
       );
     } else {
-      const newAmount = groupStock.amount + amount;
+      const newAmount = groupStock.amount - amount;
       await GroupStock.updateOne({ symbol }, { amount: newAmount });
     }
   } catch (error) {
