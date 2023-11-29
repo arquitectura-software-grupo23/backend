@@ -331,8 +331,6 @@ app.post('/validate', async (req, res) => {
   const stockSymbol = request.symbol;
   const stockQuantity = request.quantity;
 
-  addGroupStock(stockSymbol, stockQuantity);
-
   console.log(request);
 
   await fetch('http://mqtt:3001/validation', {
@@ -674,7 +672,7 @@ app.post('/addGroupStock', async (req, res) => {
         { symbol, amount },
       );
     } else {
-      const newAmount = groupStock.amount - amount;
+      const newAmount = groupStock.amount + amount;
       await GroupStock.updateOne({ symbol }, { amount: newAmount });
     }
   } catch (error) {
